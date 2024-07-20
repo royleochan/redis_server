@@ -1,4 +1,6 @@
 pub const CLRF: &str = "\r\n";
+pub const NULL_STR: &str = "$-1\r\n";
+pub const NULL_ARR: &str = "-1\r\n";
 
 #[derive(Debug, PartialEq, Eq)]
 enum DataType {
