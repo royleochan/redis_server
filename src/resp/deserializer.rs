@@ -30,7 +30,6 @@ mod tests {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"+OK\r\n"[..]);
         let resp_deserializer = RespDeserializer::default();
-        // let a = resp_deserializer.deserialize_word(&buf, 0);
         assert_eq!(
             resp_deserializer
                 .deserialize_word(&buf, 0)
