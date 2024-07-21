@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 
 use super::data::{RESPDataType, RESPError, RESPResult};
-use super::parser::{to_array, to_bulk_string, to_error, to_int, to_simple_string};
+use super::parser::{from_array, from_bulk_string, from_error, from_int, from_simple_string};
 
 #[derive(Default)]
 pub struct RespDeserializer;
@@ -13,11 +13,11 @@ impl RespDeserializer {
         }
 
         match buffer.get(pos) {
-            Some(b'+') => to_simple_string(buffer, pos + 1),
-            Some(b'-') => to_error(buffer, pos + 1),
-            Some(b':') => to_int(buffer, pos + 1),
-            Some(b'$') => to_bulk_string(buffer, pos + 1),
-            Some(b'*') => to_array(buffer, pos + 1),
+            Some(b'+') => from_simple_string(buffer, pos + 1),
+            Some(b'-') => from_error(buffer, pos + 1),
+            Some(b':') => from_int(buffer, pos + 1),
+            Some(b'$') => from_bulk_string(buffer, pos + 1),
+            Some(b'*') => from_array(buffer, pos + 1),
             _ => Err(RESPError::UnknownStartingByte),
         }
     }

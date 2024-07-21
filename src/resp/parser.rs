@@ -28,7 +28,7 @@ fn parse_word(buffer: &BytesMut, pos: usize) -> Option<(usize, &[u8])> {
 }
 
 /// Get simple string RESPResult from buffer, starting at `pos`.
-pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
+pub fn from_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => Ok(Some((
             pos,
@@ -39,7 +39,7 @@ pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
 }
 
 /// Get error RESPResult from buffer, starting at `pos`.
-pub fn to_error(buffer: &BytesMut, pos: usize) -> RESPResult {
+pub fn from_error(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => Ok(Some((
             pos,
@@ -50,7 +50,7 @@ pub fn to_error(buffer: &BytesMut, pos: usize) -> RESPResult {
 }
 
 /// Get int RESPResult from buffer, starting at `pos`.
-pub fn to_int(buffer: &BytesMut, pos: usize) -> RESPResult {
+pub fn from_int(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => {
             let s = std::str::from_utf8(slice).map_err(|_| RESPError::IntParseFailure)?;
@@ -62,8 +62,8 @@ pub fn to_int(buffer: &BytesMut, pos: usize) -> RESPResult {
 }
 
 /// Get bulk string RESPResult from buffer, starting at `pos`.
-pub fn to_bulk_string(buffer: &BytesMut, pos: usize) -> RESPResult {
-    match to_int(buffer, pos)? {
+pub fn from_bulk_string(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match from_int(buffer, pos)? {
         Some((pos, RESPDataType::Integer(-1))) => Ok(Some((pos, RESPDataType::NullBulkString))),
         Some((pos, res)) => match res {
             RESPDataType::Integer(size) => {
@@ -91,8 +91,8 @@ pub fn to_bulk_string(buffer: &BytesMut, pos: usize) -> RESPResult {
 }
 
 /// Get array RESPResult from buffer, starting at `pos`.
-pub fn to_array(buffer: &BytesMut, pos: usize) -> RESPResult {
-    match to_int(buffer, pos)? {
+pub fn from_array(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match from_int(buffer, pos)? {
         None => Ok(None),
         Some((pos, RESPDataType::Integer(-1))) => Ok(Some((pos, RESPDataType::NullArray))),
         Some((pos, res)) => match res {
@@ -157,10 +157,10 @@ mod tests {
     }
 
     #[test]
-    fn test_to_simple_string() {
+    fn test_from_simple_string() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"OK\r\n"[..]);
-        let result = to_simple_string(&buf, 0);
+        let result = from_simple_string(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::SimpleString(Bytes::from("OK")))
@@ -168,10 +168,10 @@ mod tests {
     }
 
     #[test]
-    fn test_to_error() {
+    fn test_from_error() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"error\r\n"[..]);
-        let result = to_error(&buf, 0);
+        let result = from_error(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (7 as usize, RESPDataType::Error(Bytes::from("error")))
@@ -179,10 +179,10 @@ mod tests {
     }
 
     #[test]
-    fn test_to_int() {
+    fn test_from_int() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"64\r\n"[..]);
-        let result = to_int(&buf, 0);
+        let result = from_int(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::Integer(64))
@@ -193,7 +193,7 @@ mod tests {
     fn test_bulk_str_null() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"-1\r\n"[..]);
-        let result = to_bulk_string(&buf, 0);
+        let result = from_bulk_string(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::NullBulkString)
@@ -204,15 +204,18 @@ mod tests {
     fn test_bulk_str_empty() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"0\r\n\r\n"[..]);
-        let result = to_bulk_string(&buf, 0);
-        assert_eq!(result.unwrap(), None);
+        let result = from_bulk_string(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (5, RESPDataType::BulkString(Bytes::from("")))
+        );
     }
 
     #[test]
     fn test_bulk_str_normal() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"5\r\nhello\r\n"[..]);
-        let result = to_bulk_string(&buf, 0);
+        let result = from_bulk_string(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (10 as usize, RESPDataType::BulkString(Bytes::from("hello")))
@@ -223,7 +226,7 @@ mod tests {
     fn test_array_null() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"-1\r\n"[..]);
-        let result = to_array(&buf, 0);
+        let result = from_array(&buf, 0);
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::NullArray)
@@ -234,7 +237,7 @@ mod tests {
     fn test_array_ping() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"1\r\n$4\r\nping\r\n"[..]);
-        let result = to_array(&buf, 0);
+        let result = from_array(&buf, 0);
         let expected_vec = vec![RESPDataType::BulkString(Bytes::from("ping"))];
         assert_eq!(
             result.unwrap().unwrap(),
@@ -246,7 +249,7 @@ mod tests {
     fn test_array_echo() {
         let mut buf = BytesMut::with_capacity(20);
         buf.put(&b"2\r\n$4\r\necho\r\n$11\r\nhello world\r\n"[..]);
-        let result = to_array(&buf, 0);
+        let result = from_array(&buf, 0);
         let expected_vec = vec![
             RESPDataType::BulkString(Bytes::from("echo")),
             RESPDataType::BulkString(Bytes::from("hello world")),
