@@ -15,6 +15,7 @@ pub enum RESPDataType {
 #[derive(Debug, PartialEq, Eq)]
 pub enum RESPError {
     UnknownStartingByte,
+    IntParseFailure,
 }
 
 pub type RESPResult = Result<Option<(usize, RESPDataType)>, RESPError>;

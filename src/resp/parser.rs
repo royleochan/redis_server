@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use memchr::memchr2;
 
-use super::data::{RESPDataType, RESPResult, CR, NEW_LINE};
+use super::data::{RESPDataType, RESPError, RESPResult, CR, NEW_LINE};
 
 /// Find index of carriage return in buffer.
 fn find_carraige_return(buffer: &[u8]) -> Option<usize> {
@@ -26,7 +26,7 @@ fn parse_word(buffer: &BytesMut, pos: usize) -> Option<(usize, &[u8])> {
     }
 }
 
-// Get simple string RESPResult from buffer, starting at `pos`.
+/// Get simple string RESPResult from buffer, starting at `pos`.
 pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => Ok(Some((
@@ -37,13 +37,25 @@ pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
     }
 }
 
-// Get error RESPResult from buffer, starting at `pos`.
+/// Get error RESPResult from buffer, starting at `pos`.
 pub fn to_error(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => Ok(Some((
             pos,
             RESPDataType::Error(Bytes::copy_from_slice(slice)),
         ))),
+        None => Ok(None),
+    }
+}
+
+/// Get int RESPResult from buffer, starting at `pos`.
+pub fn to_int(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match parse_word(buffer, pos) {
+        Some((pos, slice)) => {
+            let s = std::str::from_utf8(slice).map_err(|_| RESPError::IntParseFailure)?;
+            let i = s.parse::<i64>().map_err(|_| RESPError::IntParseFailure)?;
+            Ok(Some((pos, RESPDataType::Integer(i))))
+        }
         None => Ok(None),
     }
 }
@@ -92,6 +104,28 @@ mod tests {
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::SimpleString(Bytes::from("OK")))
+        );
+    }
+
+    #[test]
+    fn test_to_error() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"error\r\n"[..]);
+        let result = to_error(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (7 as usize, RESPDataType::Error(Bytes::from("error")))
+        );
+    }
+
+    #[test]
+    fn test_to_int() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"64\r\n"[..]);
+        let result = to_int(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (4 as usize, RESPDataType::Integer(64))
         );
     }
 }
