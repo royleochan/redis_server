@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 
 use super::data::{RESPDataType, RESPError, RESPResult};
-use super::parser::{to_error, to_int, to_simple_string};
+use super::parser::{to_bulk_string, to_error, to_int, to_simple_string};
 
 #[derive(Default)]
 pub struct RespDeserializer;
@@ -16,6 +16,7 @@ impl RespDeserializer {
             Some(b'+') => to_simple_string(buffer, pos + 1),
             Some(b'-') => to_error(buffer, pos + 1),
             Some(b':') => to_int(buffer, pos + 1),
+            Some(b'$') => to_bulk_string(buffer, pos + 1),
             _ => Err(RESPError::UnknownStartingByte),
         }
     }
@@ -69,6 +70,20 @@ mod tests {
                 .unwrap()
                 .unwrap(),
             (7 as usize, RESPDataType::Integer(1024))
+        )
+    }
+
+    #[test]
+    fn test_deserialize_bulk_str() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"$5\r\nlorem\r\n"[..]);
+        let resp_deserializer = RespDeserializer::default();
+        assert_eq!(
+            resp_deserializer
+                .deserialize_word(&buf, 0)
+                .unwrap()
+                .unwrap(),
+            (11 as usize, RESPDataType::BulkString(Bytes::from("lorem")))
         )
     }
 

@@ -9,6 +9,7 @@ pub enum RESPDataType {
     Error(Bytes),
     Integer(i64),
     BulkString(Bytes),
+    NullBulkString,
     Array(Vec<RESPDataType>),
 }
 
@@ -16,6 +17,7 @@ pub enum RESPDataType {
 pub enum RESPError {
     UnknownStartingByte,
     IntParseFailure,
+    NegativeBulkStringSize,
 }
 
 pub type RESPResult = Result<Option<(usize, RESPDataType)>, RESPError>;

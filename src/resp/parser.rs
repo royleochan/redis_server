@@ -60,6 +60,35 @@ pub fn to_int(buffer: &BytesMut, pos: usize) -> RESPResult {
     }
 }
 
+/// Get bulk string RESPResult from buffer, starting at `pos`.
+pub fn to_bulk_string(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match to_int(buffer, pos)? {
+        Some((pos, RESPDataType::Integer(-1))) => Ok(Some((pos, RESPDataType::NullBulkString))),
+        Some((pos, res)) => match res {
+            RESPDataType::Integer(size) => {
+                if size >= 0 {
+                    let total_size = pos + size as usize;
+                    if buffer.len() < total_size + 2 {
+                        Ok(None)
+                    } else {
+                        match parse_word(buffer, pos) {
+                            Some((_, slice)) => Ok(Some((
+                                total_size + 2,
+                                RESPDataType::BulkString(Bytes::copy_from_slice(slice)),
+                            ))),
+                            None => Ok(None),
+                        }
+                    }
+                } else {
+                    Err(RESPError::NegativeBulkStringSize)
+                }
+            }
+            _ => Ok(None),
+        },
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
@@ -126,6 +155,36 @@ mod tests {
         assert_eq!(
             result.unwrap().unwrap(),
             (4 as usize, RESPDataType::Integer(64))
+        );
+    }
+
+    #[test]
+    fn test_bulk_str_null() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"-1\r\n"[..]);
+        let result = to_bulk_string(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (4 as usize, RESPDataType::NullBulkString)
+        );
+    }
+
+    #[test]
+    fn test_bulk_str_empty() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"0\r\n\r\n"[..]);
+        let result = to_bulk_string(&buf, 0);
+        assert_eq!(result.unwrap(), None);
+    }
+
+    #[test]
+    fn test_bulk_str_normal() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"5\r\nhello\r\n"[..]);
+        let result = to_bulk_string(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (10 as usize, RESPDataType::BulkString(Bytes::from("hello")))
         );
     }
 }
