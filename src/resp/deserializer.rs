@@ -1,22 +1,23 @@
 use bytes::{Bytes, BytesMut};
 
 use super::data::{RESPDataType, RESPError, RESPResult};
-use super::parser::{to_bulk_string, to_error, to_int, to_simple_string};
+use super::parser::{to_array, to_bulk_string, to_error, to_int, to_simple_string};
 
 #[derive(Default)]
 pub struct RespDeserializer;
 
 impl RespDeserializer {
-    fn deserialize_word(self, buffer: &BytesMut, pos: usize) -> RESPResult {
+    pub fn deserialize_word(self, buffer: &BytesMut, pos: usize) -> RESPResult {
         if buffer.is_empty() {
             return Ok(None);
         }
 
-        match buffer.get(0) {
+        match buffer.get(pos) {
             Some(b'+') => to_simple_string(buffer, pos + 1),
             Some(b'-') => to_error(buffer, pos + 1),
             Some(b':') => to_int(buffer, pos + 1),
             Some(b'$') => to_bulk_string(buffer, pos + 1),
+            Some(b'*') => to_array(buffer, pos + 1),
             _ => Err(RESPError::UnknownStartingByte),
         }
     }
@@ -84,6 +85,24 @@ mod tests {
                 .unwrap()
                 .unwrap(),
             (11 as usize, RESPDataType::BulkString(Bytes::from("lorem")))
+        )
+    }
+
+    #[test]
+    fn test_deserialize_array() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"*2\r\n$4\r\necho\r\n$11\r\nhello world\r\n"[..]);
+        let resp_deserializer = RespDeserializer::default();
+        let expected_vec = vec![
+            RESPDataType::BulkString(Bytes::from("echo")),
+            RESPDataType::BulkString(Bytes::from("hello world")),
+        ];
+        assert_eq!(
+            resp_deserializer
+                .deserialize_word(&buf, 0)
+                .unwrap()
+                .unwrap(),
+            (32 as usize, RESPDataType::Array(expected_vec))
         )
     }
 

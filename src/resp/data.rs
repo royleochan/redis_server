@@ -11,13 +11,15 @@ pub enum RESPDataType {
     BulkString(Bytes),
     NullBulkString,
     Array(Vec<RESPDataType>),
+    NullArray,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RESPError {
     UnknownStartingByte,
     IntParseFailure,
-    NegativeBulkStringSize,
+    InvalidBulkStringSize,
+    InvalidArrayElementSize,
 }
 
 pub type RESPResult = Result<Option<(usize, RESPDataType)>, RESPError>;

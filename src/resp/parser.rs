@@ -2,6 +2,7 @@ use bytes::{Bytes, BytesMut};
 use memchr::memchr2;
 
 use super::data::{RESPDataType, RESPError, RESPResult, CR, NEW_LINE};
+use super::deserializer::RespDeserializer;
 
 /// Find index of carriage return in buffer.
 fn find_carraige_return(buffer: &[u8]) -> Option<usize> {
@@ -80,12 +81,42 @@ pub fn to_bulk_string(buffer: &BytesMut, pos: usize) -> RESPResult {
                         }
                     }
                 } else {
-                    Err(RESPError::NegativeBulkStringSize)
+                    Err(RESPError::InvalidBulkStringSize)
                 }
             }
             _ => Ok(None),
         },
         None => Ok(None),
+    }
+}
+
+/// Get array RESPResult from buffer, starting at `pos`.
+pub fn to_array(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match to_int(buffer, pos)? {
+        None => Ok(None),
+        Some((pos, RESPDataType::Integer(-1))) => Ok(Some((pos, RESPDataType::NullArray))),
+        Some((pos, res)) => match res {
+            RESPDataType::Integer(num_elements) => {
+                if num_elements > 0 {
+                    let mut resp_data_types = Vec::with_capacity(num_elements as usize);
+                    let mut curr_pos = pos;
+                    for _ in 0..num_elements {
+                        let deserializer = RespDeserializer::default();
+                        match deserializer.deserialize_word(buffer, curr_pos)? {
+                            Some((new_pos, resp_data_type)) => {
+                                curr_pos = new_pos;
+                                resp_data_types.push(resp_data_type)
+                            }
+                            None => return Ok(None),
+                        };
+                    }
+                    Ok(Some((curr_pos, RESPDataType::Array(resp_data_types))))
+                } else {
+                    Err(RESPError::InvalidArrayElementSize)
+                }
+            }
+            _ => Ok(None),
+        },
     }
 }
 
@@ -185,6 +216,44 @@ mod tests {
         assert_eq!(
             result.unwrap().unwrap(),
             (10 as usize, RESPDataType::BulkString(Bytes::from("hello")))
+        );
+    }
+
+    #[test]
+    fn test_array_null() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"-1\r\n"[..]);
+        let result = to_array(&buf, 0);
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (4 as usize, RESPDataType::NullArray)
+        );
+    }
+
+    #[test]
+    fn test_array_ping() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"1\r\n$4\r\nping\r\n"[..]);
+        let result = to_array(&buf, 0);
+        let expected_vec = vec![RESPDataType::BulkString(Bytes::from("ping"))];
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (13 as usize, RESPDataType::Array(expected_vec))
+        );
+    }
+
+    #[test]
+    fn test_array_echo() {
+        let mut buf = BytesMut::with_capacity(20);
+        buf.put(&b"2\r\n$4\r\necho\r\n$11\r\nhello world\r\n"[..]);
+        let result = to_array(&buf, 0);
+        let expected_vec = vec![
+            RESPDataType::BulkString(Bytes::from("echo")),
+            RESPDataType::BulkString(Bytes::from("hello world")),
+        ];
+        assert_eq!(
+            result.unwrap().unwrap(),
+            (31 as usize, RESPDataType::Array(expected_vec))
         );
     }
 }
