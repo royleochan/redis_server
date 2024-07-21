@@ -4,7 +4,7 @@ use memchr::memchr2;
 use super::data::{RESPDataType, RESPResult, CR, NEW_LINE};
 
 /// Find index of carriage return in buffer.
-fn find_carraige_return(buffer: &BytesMut) -> Option<usize> {
+fn find_carraige_return(buffer: &[u8]) -> Option<usize> {
     let end = memchr2(CR, NEW_LINE, buffer)?;
     if *buffer.get(end + 1)? != NEW_LINE {
         return None;
@@ -18,7 +18,7 @@ fn parse_word(buffer: &BytesMut, pos: usize) -> Option<(usize, &[u8])> {
         return None;
     }
 
-    let index = find_carraige_return(buffer);
+    let index = find_carraige_return(&buffer[pos..]);
 
     match index {
         Some(end_index) => Some((pos + end_index + 2, &buffer[pos..pos + end_index])),
@@ -26,7 +26,8 @@ fn parse_word(buffer: &BytesMut, pos: usize) -> Option<(usize, &[u8])> {
     }
 }
 
-fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
+// Get simple string RESPResult from buffer, starting at `pos`.
+pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
     match parse_word(buffer, pos) {
         Some((pos, slice)) => Ok(Some((
             pos,
