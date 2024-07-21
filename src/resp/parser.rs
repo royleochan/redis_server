@@ -37,6 +37,17 @@ pub fn to_simple_string(buffer: &BytesMut, pos: usize) -> RESPResult {
     }
 }
 
+// Get error RESPResult from buffer, starting at `pos`.
+pub fn to_error(buffer: &BytesMut, pos: usize) -> RESPResult {
+    match parse_word(buffer, pos) {
+        Some((pos, slice)) => Ok(Some((
+            pos,
+            RESPDataType::Error(Bytes::copy_from_slice(slice)),
+        ))),
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;

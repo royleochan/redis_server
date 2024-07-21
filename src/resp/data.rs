@@ -12,7 +12,7 @@ pub enum RESPDataType {
     Array(Vec<RESPDataType>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RESPError {
     UnknownStartingByte,
 }
