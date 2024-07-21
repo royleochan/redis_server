@@ -5,7 +5,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use redis_server::ThreadPool;
+use redis_server::thread_pool::ThreadPool;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
