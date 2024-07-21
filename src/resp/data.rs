@@ -1,51 +1,20 @@
-pub const CLRF: &str = "\r\n";
-pub const NULL_STR: &str = "$-1\r\n";
-pub const NULL_ARR: &str = "-1\r\n";
+use bytes::Bytes;
 
-#[derive(Debug, PartialEq, Eq)]
-enum DataType {
-    SimpleString,
-    Error,
-    Integer,
-    BulkString,
-    Array,
+pub const CR: u8 = b'\r';
+pub const NEW_LINE: u8 = b'\n';
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RESPDataType {
+    SimpleString(Bytes),
+    Error(Bytes),
+    Integer(i64),
+    BulkString(Bytes),
+    Array(Vec<RESPDataType>),
 }
 
-impl DataType {
-    fn from(character: &str) -> Result<Self, String> {
-        match character {
-            "+" => Ok(DataType::SimpleString),
-            "-" => Ok(DataType::Error),
-            ":" => Ok(DataType::Integer),
-            "$" => Ok(DataType::BulkString),
-            "*" => Ok(DataType::Array),
-            _ => Err("Invalid data type".to_string()),
-        }
-    }
+#[derive(Debug)]
+pub enum RESPError {
+    UnknownStartingByte,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_const() {
-        let result = "\r\n";
-        assert_eq!(result, CLRF);
-    }
-
-    #[test]
-    fn test_from_valid() {
-        assert_eq!(DataType::from("+").unwrap(), DataType::SimpleString);
-        assert_eq!(DataType::from("-").unwrap(), DataType::Error);
-        assert_eq!(DataType::from(":").unwrap(), DataType::Integer);
-        assert_eq!(DataType::from("$").unwrap(), DataType::BulkString);
-        assert_eq!(DataType::from("*").unwrap(), DataType::Array);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid data type")]
-    fn test_from_invalid() {
-        DataType::from("lorem").unwrap();
-    }
-}
+pub type RESPResult = Result<Option<(usize, RESPDataType)>, RESPError>;
