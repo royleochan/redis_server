@@ -1,4 +1,5 @@
 pub mod resp;
+pub mod store;
 pub mod thread_pool;
 
 use std::{
@@ -11,8 +12,9 @@ use bytes::{BufMut, BytesMut};
 use resp::data::RESPDataType;
 use resp::deserializer::RespDeserializer;
 use resp::serializer::RespSerializer;
+use store::Store;
 
-pub fn handle_connection(mut stream: TcpStream) {
+pub fn handle_connection(mut stream: TcpStream, store: &mut Store) {
     let command: BytesMut = get_command(&stream);
 
     let resp_deserializer = RespDeserializer::default();
@@ -20,7 +22,7 @@ pub fn handle_connection(mut stream: TcpStream) {
 
     if let Ok(value) = resp_result {
         if let Some((_, resp_data_type)) = value {
-            let response = handle_resp_command(resp_data_type);
+            let response = handle_resp_command(resp_data_type, store);
             if response.len() > 0 {
                 stream.write_all(response.as_bytes()).unwrap();
             }
@@ -41,7 +43,7 @@ fn get_command(mut stream: &TcpStream) -> BytesMut {
     }
 }
 
-fn handle_resp_command(resp_command: RESPDataType) -> String {
+fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String {
     if let RESPDataType::Array(resp_data_types) = resp_command {
         let first = resp_data_types.get(0);
         match first.unwrap() {
@@ -49,6 +51,8 @@ fn handle_resp_command(resp_command: RESPDataType) -> String {
                 match String::from_utf8(first_command.to_vec()).unwrap().as_str() {
                     "ping" => handle_ping(),
                     "echo" => handle_echo(resp_data_types),
+                    "set" => handle_set(resp_data_types, store),
+                    "get" => handle_get(resp_data_types, store),
                     _ => handle_null(),
                 }
             }
@@ -77,6 +81,30 @@ fn handle_echo(resp_data_types: Vec<RESPDataType>) -> String {
     if let RESPDataType::BulkString(return_msg) = msg {
         return resp_serializer
             .serialize_ss(String::from_utf8(return_msg.to_vec()).unwrap().as_str());
+    } else {
+        panic!("Echo should be followed by a string.")
+    }
+}
+
+fn handle_set(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
+    let resp_serializer: RespSerializer = RespSerializer::default();
+    let key_resp = resp_data_types.get(1).unwrap();
+    let val_resp = resp_data_types.get(2).unwrap();
+    match (key_resp, val_resp) {
+        (RESPDataType::BulkString(key), RESPDataType::BulkString(val)) => {
+            store.set_key_val(key.clone(), val.clone());
+            return resp_serializer.serialize_ss("OK");
+        }
+        _ => panic!("Set should be followed by 2 bulk strings."),
+    }
+}
+
+fn handle_get(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
+    let resp_serializer: RespSerializer = RespSerializer::default();
+    let key_resp = resp_data_types.get(1).unwrap();
+    if let RESPDataType::BulkString(key) = key_resp {
+        let value = store.get_from_key_val_store(key.clone());
+        return resp_serializer.serialize_ss(String::from_utf8(value.to_vec()).unwrap().as_str());
     } else {
         panic!("Echo should be followed by a string.")
     }
