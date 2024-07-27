@@ -102,7 +102,7 @@ pub fn from_array(buffer: &BytesMut, pos: usize) -> RESPResult {
                     let mut curr_pos = pos;
                     for _ in 0..num_elements {
                         let deserializer = RespDeserializer::default();
-                        match deserializer.deserialize_word(buffer, curr_pos)? {
+                        match deserializer.deserialize(buffer, curr_pos)? {
                             Some((new_pos, resp_data_type)) => {
                                 curr_pos = new_pos;
                                 resp_data_types.push(resp_data_type)
