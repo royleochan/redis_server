@@ -49,11 +49,18 @@ fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String 
         match first.unwrap() {
             RESPDataType::BulkString(first_command) => {
                 match String::from_utf8(first_command.to_vec()).unwrap().as_str() {
-                    "ping" => handle_ping(),
-                    "echo" => handle_echo(resp_data_types),
-                    "set" => handle_set(resp_data_types, store),
-                    "get" => handle_get(resp_data_types, store),
-                    _ => handle_null(),
+                    "config" | "CONFIG" => handle_config(),
+                    "ping" | "PING" => handle_ping(),
+                    "echo" | "ECHO" => handle_echo(resp_data_types),
+                    "set" | "SET" => handle_set(resp_data_types, store),
+                    "get" | "GET" => handle_get(resp_data_types, store),
+                    _ => {
+                        println!(
+                            "{}",
+                            String::from_utf8(first_command.to_vec()).unwrap().as_str()
+                        );
+                        return handle_null();
+                    }
                 }
             }
             _ => {
@@ -68,6 +75,20 @@ fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String 
 fn handle_null() -> String {
     println!("Unimplemented command");
     return String::from("");
+}
+
+fn handle_config() -> String {
+    println!("TODO");
+    let mut resp = String::new();
+    let elements = ["save", "900 1"];
+    resp.push_str(&format!("*{}\r\n", elements.len()));
+
+    for element in elements {
+        resp.push_str(&format!("${}\r\n", element.len()));
+        resp.push_str(&format!("{}\r\n", element));
+    }
+
+    resp
 }
 
 fn handle_ping() -> String {
