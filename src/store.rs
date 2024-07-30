@@ -18,7 +18,7 @@ impl Store {
         self.key_val_store.insert(key, val);
     }
 
-    pub fn get_from_key_val_store(&self, key: Bytes) -> Bytes {
-        self.key_val_store.get(&key).unwrap().clone()
+    pub fn get_from_key_val_store(&self, key: Bytes) -> Option<&Bytes> {
+        self.key_val_store.get(&key)
     }
 }

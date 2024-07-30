@@ -54,41 +54,29 @@ fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String 
                     "echo" | "ECHO" => handle_echo(resp_data_types),
                     "set" | "SET" => handle_set(resp_data_types, store),
                     "get" | "GET" => handle_get(resp_data_types, store),
-                    _ => {
-                        println!(
-                            "{}",
-                            String::from_utf8(first_command.to_vec()).unwrap().as_str()
-                        );
-                        return handle_null();
-                    }
+                    _ => return handle_default(),
                 }
             }
-            _ => {
-                panic!("First element in command should be a bulk string.")
-            }
+            _ => handle_error("First element in command should be a bulk string."),
         }
     } else {
-        panic!("Command should be an array.")
+        handle_error("Command should be an array.")
     }
 }
 
-fn handle_null() -> String {
-    println!("Unimplemented command");
-    return String::from("");
+fn handle_error(error_str: &str) -> String {
+    let resp_serializer: RespSerializer = RespSerializer::default();
+    return resp_serializer.serialize_error(error_str);
+}
+
+fn handle_default() -> String {
+    return handle_error("Unimplemented command.");
 }
 
 fn handle_config() -> String {
     println!("TODO");
-    let mut resp = String::new();
-    let elements = ["save", "900 1"];
-    resp.push_str(&format!("*{}\r\n", elements.len()));
-
-    for element in elements {
-        resp.push_str(&format!("${}\r\n", element.len()));
-        resp.push_str(&format!("{}\r\n", element));
-    }
-
-    resp
+    let resp_serializer: RespSerializer = RespSerializer::default();
+    return resp_serializer.serialize_ss("To implement.");
 }
 
 fn handle_ping() -> String {
@@ -103,7 +91,7 @@ fn handle_echo(resp_data_types: Vec<RESPDataType>) -> String {
         return resp_serializer
             .serialize_ss(String::from_utf8(return_msg.to_vec()).unwrap().as_str());
     } else {
-        panic!("Echo should be followed by a string.")
+        return handle_error("Echo should be followed by a string.");
     }
 }
 
@@ -116,7 +104,7 @@ fn handle_set(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
             store.set_key_val(key.clone(), val.clone());
             return resp_serializer.serialize_ss("OK");
         }
-        _ => panic!("Set should be followed by 2 bulk strings."),
+        _ => return handle_error("Set should be followed by 2 bulk strings."),
     }
 }
 
@@ -125,8 +113,12 @@ fn handle_get(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
     let key_resp = resp_data_types.get(1).unwrap();
     if let RESPDataType::BulkString(key) = key_resp {
         let value = store.get_from_key_val_store(key.clone());
-        return resp_serializer.serialize_ss(String::from_utf8(value.to_vec()).unwrap().as_str());
+        if let Some(result) = value {
+            return resp_serializer
+                .serialize_ss(String::from_utf8(result.to_vec()).unwrap().as_str());
+        }
+        return resp_serializer.serialize_nil();
     } else {
-        panic!("Echo should be followed by a string.")
+        return handle_error("Echo should be followed by a string.");
     }
 }
