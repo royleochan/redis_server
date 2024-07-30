@@ -86,17 +86,25 @@ fn handle_ping() -> String {
 
 fn handle_echo(resp_data_types: Vec<RESPDataType>) -> String {
     let resp_serializer: RespSerializer = RespSerializer::default();
-    let msg = resp_data_types.get(1).unwrap();
-    if let RESPDataType::BulkString(return_msg) = msg {
-        return resp_serializer
-            .serialize_ss(String::from_utf8(return_msg.to_vec()).unwrap().as_str());
-    } else {
-        return handle_error("Echo should be followed by a string.");
+    if let Some(msg) = resp_data_types.get(1) {
+        if let RESPDataType::BulkString(return_msg) = msg {
+            return resp_serializer
+                .serialize_ss(String::from_utf8(return_msg.to_vec()).unwrap().as_str());
+        } else {
+            return handle_error("Echo should be followed by a string.");
+        }
     }
+    return handle_error("Missing 'message' argument.");
 }
 
 fn handle_set(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
     let resp_serializer: RespSerializer = RespSerializer::default();
+    if resp_data_types.get(1).is_none() {
+        return handle_error("Missing 'key' argument.");
+    }
+    if resp_data_types.get(2).is_none() {
+        return handle_error("Missing 'value' argument.");
+    }
     let key_resp = resp_data_types.get(1).unwrap();
     let val_resp = resp_data_types.get(2).unwrap();
     match (key_resp, val_resp) {
@@ -110,15 +118,17 @@ fn handle_set(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
 
 fn handle_get(resp_data_types: Vec<RESPDataType>, store: &mut Store) -> String {
     let resp_serializer: RespSerializer = RespSerializer::default();
-    let key_resp = resp_data_types.get(1).unwrap();
-    if let RESPDataType::BulkString(key) = key_resp {
-        let value = store.get_from_key_val_store(key.clone());
-        if let Some(result) = value {
-            return resp_serializer
-                .serialize_ss(String::from_utf8(result.to_vec()).unwrap().as_str());
+    if let Some(key_resp) = resp_data_types.get(1) {
+        if let RESPDataType::BulkString(key) = key_resp {
+            let value = store.get_from_key_val_store(key.clone());
+            if let Some(result) = value {
+                return resp_serializer
+                    .serialize_ss(String::from_utf8(result.to_vec()).unwrap().as_str());
+            }
+            return resp_serializer.serialize_nil();
+        } else {
+            return handle_error("Echo should be followed by a string.");
         }
-        return resp_serializer.serialize_nil();
-    } else {
-        return handle_error("Echo should be followed by a string.");
     }
+    return handle_error("Missing 'key' argument.");
 }
