@@ -8,7 +8,7 @@ use std::{
 };
 
 use bytes::{BufMut, BytesMut};
-use log::{debug, error, info};
+use log::{error, info};
 
 use resp::data::RESPDataType;
 use resp::deserializer::RespDeserializer;
