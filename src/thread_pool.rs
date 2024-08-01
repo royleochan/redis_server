@@ -3,6 +3,8 @@ use std::{
     thread,
 };
 
+use log::{error, info};
+
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: mpsc::Sender<Job>,
@@ -47,14 +49,14 @@ impl Worker {
         let result = builder.spawn(move || loop {
             let job = receiver.lock().unwrap().recv().unwrap();
 
-            println!("Worker {id} got a job; executing.");
+            info!("Worker {id} got a job; executing.");
 
             job();
         });
         match result {
             Ok(thread) => Ok(Worker { id, thread }),
             Err(e) => {
-                eprintln!("Thread failed: {:?}", e);
+                error!("Thread failed: {:?}", e);
                 Err("Error spawning thread".to_string())
             }
         }

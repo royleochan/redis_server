@@ -8,6 +8,7 @@ use std::{
 };
 
 use bytes::{BufMut, BytesMut};
+use log::{debug, error, info};
 
 use resp::data::RESPDataType;
 use resp::deserializer::RespDeserializer;
@@ -15,6 +16,8 @@ use resp::serializer::RespSerializer;
 use store::Store;
 
 pub fn handle_connection(mut stream: TcpStream, store: &mut Store) {
+    info!("Handling new connection.");
+
     let command: BytesMut = get_command(&stream);
 
     let resp_deserializer = RespDeserializer::default();
@@ -27,6 +30,8 @@ pub fn handle_connection(mut stream: TcpStream, store: &mut Store) {
                 stream.write_all(response.as_bytes()).unwrap();
             }
         }
+    } else {
+        error!("Error occured while deserializing command.");
     }
 }
 
@@ -45,11 +50,12 @@ fn get_command(mut stream: &TcpStream) -> BytesMut {
 
 fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String {
     if let RESPDataType::Array(resp_data_types) = resp_command {
+        info!("Handling command {:?}", resp_data_types);
         let first = resp_data_types.get(0);
         match first.unwrap() {
             RESPDataType::BulkString(first_command) => {
                 match String::from_utf8(first_command.to_vec()).unwrap().as_str() {
-                    "config" | "CONFIG" => handle_config(),
+                    "config" | "CONFIG" => handle_config(resp_data_types),
                     "ping" | "PING" => handle_ping(),
                     "echo" | "ECHO" => handle_echo(resp_data_types),
                     "set" | "SET" => handle_set(resp_data_types, store),
@@ -74,9 +80,7 @@ fn handle_default() -> String {
 }
 
 fn handle_config() -> String {
-    println!("TODO");
-    let resp_serializer: RespSerializer = RespSerializer::default();
-    return resp_serializer.serialize_ss("To implement.");
+    return String::from("*2\r\n$4\r\nsave\r\n$0\r\n\r\n");
 }
 
 fn handle_ping() -> String {
