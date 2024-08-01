@@ -55,7 +55,7 @@ fn handle_resp_command(resp_command: RESPDataType, store: &mut Store) -> String 
         match first.unwrap() {
             RESPDataType::BulkString(first_command) => {
                 match String::from_utf8(first_command.to_vec()).unwrap().as_str() {
-                    "config" | "CONFIG" => handle_config(resp_data_types),
+                    "config" | "CONFIG" => handle_config(),
                     "ping" | "PING" => handle_ping(),
                     "echo" | "ECHO" => handle_echo(resp_data_types),
                     "set" | "SET" => handle_set(resp_data_types, store),
